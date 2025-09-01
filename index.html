@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin + Shop Demo</title>
+<title>Admin Panel & Shop (All-in-One)</title>
 <style>
-body { font-family: Arial, sans-serif; background:#f7f6fb; padding:2rem; }
+body { font-family: Arial, sans-serif; background: #f7f6fb; padding: 2rem; }
 h1 { text-align:center; color:#4b145b; }
 form { max-width:500px; margin:2rem auto; background:#fff; padding:1.5rem; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 input, textarea, button { width:100%; margin:0.5rem 0; padding:0.75rem; border-radius:6px; border:1px solid #ccc; font-size:1rem; }
@@ -13,7 +13,7 @@ button { background:#4b145b; color:#fff; border:none; cursor:pointer; transition
 button:hover { background:#6a3e8e; }
 #status { font-weight:bold; margin-top:0.5rem; }
 .preview { text-align:center; margin:1rem 0; }
-.preview img { max-width:100%; max-height:200px; border-radius:8px; display:block; margin:auto; }
+.preview img { max-width:100%; max-height:200px; border-radius:8px; }
 .products { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:1.5rem; margin-top:3rem; }
 .product { background:#fff; padding:1rem; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); text-align:center; }
 .product img { width:100%; height:180px; object-fit:cover; border-radius:8px; display:block; margin:auto; }
@@ -41,97 +41,89 @@ button:hover { background:#6a3e8e; }
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <script>
-// --- Firebase setup ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDf1FkJtMo6YLlk2BSv1fjark3dmpE634o",
-  authDomain: "fir-shop-75d43.firebaseapp.com",
-  databaseURL: "https://fir-shop-75d43-default-rtdb.firebaseio.com",
-  projectId: "fir-shop-75d43",
-  storageBucket: "fir-shop-75d43.firebasestorage.app",
-  messagingSenderId: "276108382023",
-  appId: "1:276108382023:web:b303c079df2cd29edac662"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+  // Firebase setup
+  const firebaseConfig = {
+    apiKey: "AIzaSyDf1FkJtMo6YLlk2BSv1fjark3dmpE634o",
+    authDomain: "fir-shop-75d43.firebaseapp.com",
+    databaseURL: "https://fir-shop-75d43-default-rtdb.firebaseio.com",
+    projectId: "fir-shop-75d43",
+    storageBucket: "fir-shop-75d43.firebasestorage.app",
+    messagingSenderId: "276108382023",
+    appId: "1:276108382023:web:b303c079df2cd29edac662"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-// --- Image preview ---
-const imageInput = document.getElementById("image");
-const preview = document.getElementById("preview");
-imageInput.addEventListener("change", () => {
-  const file = imageInput.files[0];
-  if (!file) { preview.innerHTML = ""; return; }
-  const reader = new FileReader();
-  reader.onload = e => preview.innerHTML = `<img src="${e.target.result}">`;
-  reader.readAsDataURL(file);
-});
+  const imageInput = document.getElementById("image");
+  const preview = document.getElementById("preview");
+  const status = document.getElementById("status");
+  const productsContainer = document.getElementById("products");
 
-// --- Upload via serverless ---
-async function uploadToServer(file) {
-  const reader = new FileReader();
-  return new Promise((resolve, reject) => {
-    reader.onload = async () => {
-      try {
-        const base64 = reader.result.split(",")[1];
-        const res = await fetch("./upload.js", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file: base64 })
-        });
-        if (!res.ok) throw new Error("Upload failed");
-        const data = await res.json();
-        resolve(data.url);
-      } catch(err) { reject(err); }
-    };
+  imageInput.addEventListener("change", ()=>{
+    const file = imageInput.files[0];
+    if(!file){ preview.innerHTML=""; return; }
+    const reader = new FileReader();
+    reader.onload = e => preview.innerHTML = `<img src="${e.target.result}">`;
     reader.readAsDataURL(file);
   });
-}
 
-// --- Form submit ---
-const form = document.getElementById("uploadForm");
-const status = document.getElementById("status");
-const productsContainer = document.getElementById("products");
+  // Upload to Catbox via fetch
+  async function uploadToCatbox(file){
+    const formData = new FormData();
+    formData.append("reqtype","fileupload");
+    formData.append("userhash","");
+    formData.append("fileToUpload",file);
 
-form.addEventListener("submit", async e => {
-  e.preventDefault();
-  status.textContent = "⏳ Uploading...";
-
-  const name = document.getElementById("name").value;
-  const description = document.getElementById("description").value;
-  const price = parseFloat(document.getElementById("price").value);
-  const file = imageInput.files[0];
-  if (!file) { status.textContent="❌ Select an image"; return; }
-
-  try {
-    const imageUrl = await uploadToServer(file);
-
-    // Save to Firebase
-    await db.ref("products").push({ name, description, price, image: imageUrl });
-
-    status.textContent = "✅ Product uploaded!";
-    form.reset();
-    preview.innerHTML = "";
-  } catch(err) {
-    console.error(err);
-    status.textContent = "❌ Upload failed: " + err.message;
+    // If deployed on Vercel, direct fetch works; else need a CORS proxy
+    const res = await fetch("https://catbox.moe/user/api.php", {method:"POST", body:formData});
+    if(!res.ok) throw new Error("Upload failed");
+    const url = await res.text();
+    if(!url.startsWith("http")) throw new Error("Invalid Catbox response: "+url);
+    return url;
   }
-});
 
-// --- Display products ---
-db.ref("products").on("value", snapshot => {
-  productsContainer.innerHTML = "";
-  snapshot.forEach(child => {
-    const p = child.val();
-    const div = document.createElement("div");
-    div.className = "product";
-    div.innerHTML = `
-      <img src="${p.image}" alt="${p.name}">
-      <h3>${p.name}</h3>
-      <p>${p.description}</p>
-      <div class="price">₦${p.price}</div>
-    `;
-    productsContainer.appendChild(div);
+  document.getElementById("uploadForm").addEventListener("submit", async e=>{
+    e.preventDefault();
+    status.textContent = "⏳ Uploading...";
+
+    const name = document.getElementById("name").value;
+    const description = document.getElementById("description").value;
+    const price = parseFloat(document.getElementById("price").value);
+    const file = imageInput.files[0];
+    if(!file){ status.textContent="❌ Select an image"; return; }
+
+    try{
+      const imageUrl = await uploadToCatbox(file);
+
+      // Save to Firebase
+      const productsRef = db.ref("products");
+      await productsRef.push({name, description, price, image: imageUrl});
+
+      status.textContent = "✅ Product uploaded!";
+      document.getElementById("uploadForm").reset();
+      preview.innerHTML = "";
+    }catch(err){
+      console.error(err);
+      status.textContent = "❌ Upload failed: "+err.message;
+    }
   });
-});
+
+  // Display products live
+  db.ref("products").on("value", snapshot=>{
+    productsContainer.innerHTML="";
+    snapshot.forEach(child=>{
+      const p = child.val();
+      const div = document.createElement("div");
+      div.className="product";
+      div.innerHTML = `
+        <img src="${p.image}" alt="${p.name}">
+        <h3>${p.name}</h3>
+        <p>${p.description}</p>
+        <div class="price">₦${p.price}</div>
+      `;
+      productsContainer.appendChild(div);
+    });
+  });
 </script>
 
 </body>
