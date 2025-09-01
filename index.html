@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>React Catbox Shop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+
+const { useState, useEffect } = React;
+
+function App() {
+  const [products,setProducts] = useState([]);
+  const [file,setFile] = useState(null);
+  const [preview,setPreview] = useState(null);
+  const [status,setStatus] = useState("");
+  const [name,setName] = useState("");
+  const [description,setDescription] = useState("");
+  const [price,setPrice] = useState("");
+
+  // Firebase
+  const firebaseConfig = {
+    apiKey:"AIzaSyDf1FkJtMo6YLlk2BSv1fjark3dmpE634o",
+    authDomain:"fir-shop-75d43.firebaseapp.com",
+    databaseURL:"https://fir-shop-75d43-default-rtdb.firebaseio.com",
+    projectId:"fir-shop-75d43",
+    storageBucket:"fir-shop-75d43.firebasestorage.app",
+    messagingSenderId:"276108382023",
+    appId:"1:276108382023:web:b303c079df2cd29edac662"
+  };
+  const app = firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  useEffect(()=>{
+    const productsRef = firebase.database().ref("products");
+    productsRef.on("value", snapshot=>{
+      const data = snapshot.val() || {};
+      setProducts(Object.values(data));
+    });
+  },[]);
+
+  const handleFileChange = e=>{
+    const f = e.target.files[0];
+    setFile(f);
+    if(f){
+      const reader = new FileReader();
+      reader.onload = e => setPreview(e.target.result);
+      reader.readAsDataURL(f);
+    } else setPreview(null);
+  };
+
+  const uploadToCatbox = async (file)=>{
+    const formData = new FormData();
+    formData.append("reqtype","fileupload");
+    formData.append("userhash","");
+    formData.append("fileToUpload",file);
+
+    const res = await fetch("https://catbox.moe/user/api.php", {method:"POST", body:formData});
+    const url = await res.text();
+    if(!url.startsWith("http")) throw new Error("Invalid response from Catbox: "+url);
+    return url;
+  };
+
+  const handleSubmit = async e=>{
+    e.preventDefault();
+    if(!file || !name || !price){ setStatus("❌ Fill all fields"); return; }
+    setStatus("⏳ Uploading...");
+
+    try{
+      const imageUrl = await uploadToCatbox(file);
+      const productsRef = firebase.database().ref("products");
+      await productsRef.push({name,description,price,image:imageUrl});
+      setStatus("✅ Product uploaded!");
+      setFile(null);
+      setPreview(null);
+      setName("");
+      setDescription("");
+      setPrice("");
+    } catch(err){
+      console.error(err);
+      setStatus("❌ Upload failed: "+err.message);
+    }
+  };
+
+  const style = {maxWidth:"500px", margin:"2rem auto", padding:"1.5rem", background:"#fff", borderRadius:"12px", boxShadow:"0 2px 8px rgba(0,0,0,0.1)"};
+
+  return (
+    <div style={{padding:"2rem", fontFamily:"Arial, sans-serif", background:"#f7f6fb"}}>
+      <h1 style={{textAlign:"center", color:"#4b145b"}}>React Admin & Shop</h1>
+      <form style={style} onSubmit={handleSubmit}>
+        <input style={{width:"100%", margin:"0.5rem 0"}} placeholder="Product Name" value={name} onChange={e=>setName(e.target.value)}/>
+        <textarea style={{width:"100%", margin:"0.5rem 0"}} placeholder="Description" value={description} onChange={e=>setDescription(e.target.value)}></textarea>
+        <input style={{width:"100%", margin:"0.5rem 0"}} type="number" placeholder="Price" value={price} onChange={e=>setPrice(e.target.value)}/>
+        <input style={{width:"100%", margin:"0.5rem 0"}} type="file" accept="image/*" onChange={handleFileChange}/>
+        {preview && <div style={{textAlign:"center", margin:"1rem 0"}}><img src={preview} alt="preview" style={{maxWidth:"100%", maxHeight:"200px", borderRadius:"8px"}}/></div>}
+        <button style={{width:"100%", margin:"0.5rem 0", background:"#4b145b", color:"#fff", padding:"0.75rem", border:"none", borderRadius:"6px"}}>Upload Product</button>
+        <p>{status}</p>
+      </form>
+
+      <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))", gap:"1.5rem", marginTop:"3rem"}}>
+        {products.map((p,i)=>(
+          <div key={i} style={{background:"#fff", padding:"1rem", borderRadius:"10px", boxShadow:"0 2px 6px rgba(0,0,0,0.1)", textAlign:"center"}}>
+            <img src={p.image} alt={p.name} style={{width:"100%", height:"180px", objectFit:"cover", borderRadius:"8px"}}/>
+            <h3>{p.name}</h3>
+            <p>{p.description}</p>
+            <div style={{color:"#6a3e8e", fontWeight:"bold", marginTop:"0.5rem"}}>₦{p.price}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+
+</script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</body>
+</html>
