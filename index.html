@@ -41,6 +41,7 @@ button:hover { background:#6a3e8e; }
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <script>
+// --- Firebase setup ---
 const firebaseConfig = {
   apiKey: "AIzaSyDf1FkJtMo6YLlk2BSv1fjark3dmpE634o",
   authDomain: "fir-shop-75d43.firebaseapp.com",
@@ -53,6 +54,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// --- Image preview ---
 const imageInput = document.getElementById("image");
 const preview = document.getElementById("preview");
 imageInput.addEventListener("change", () => {
@@ -63,6 +65,28 @@ imageInput.addEventListener("change", () => {
   reader.readAsDataURL(file);
 });
 
+// --- Upload via serverless ---
+async function uploadToServer(file) {
+  const reader = new FileReader();
+  return new Promise((resolve, reject) => {
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result.split(",")[1];
+        const res = await fetch("./upload.js", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: base64 })
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = await res.json();
+        resolve(data.url);
+      } catch(err) { reject(err); }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// --- Form submit ---
 const form = document.getElementById("uploadForm");
 const status = document.getElementById("status");
 const productsContainer = document.getElementById("products");
@@ -78,34 +102,21 @@ form.addEventListener("submit", async e => {
   if (!file) { status.textContent="❌ Select an image"; return; }
 
   try {
-    // Convert to base64
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-      const base64 = reader.result.split(',')[1];
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64 })
-      });
-      const data = await res.json();
-      const imageUrl = data.url;
+    const imageUrl = await uploadToServer(file);
 
-      // Save to Firebase
-      const productsRef = db.ref("products");
-      await productsRef.push({ name, description, price, image: imageUrl });
+    // Save to Firebase
+    await db.ref("products").push({ name, description, price, image: imageUrl });
 
-      status.textContent = "✅ Product uploaded!";
-      form.reset();
-      preview.innerHTML = "";
-    }
+    status.textContent = "✅ Product uploaded!";
+    form.reset();
+    preview.innerHTML = "";
   } catch(err) {
     console.error(err);
     status.textContent = "❌ Upload failed: " + err.message;
   }
 });
 
-// Display products
+// --- Display products ---
 db.ref("products").on("value", snapshot => {
   productsContainer.innerHTML = "";
   snapshot.forEach(child => {
@@ -122,5 +133,6 @@ db.ref("products").on("value", snapshot => {
   });
 });
 </script>
+
 </body>
 </html>
