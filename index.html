@@ -1,100 +1,355 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>DNA Shoes Shop + Upload</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f7f7f7; }
-    h1 { color: #4b145b; }
-    .uploader, .shop { margin-bottom: 30px; }
-    input, button { padding: 10px; margin: 5px 0; }
-    .products { display: flex; flex-wrap: wrap; gap: 15px; }
-    .product {
-      width: 200px;
-      border: 1px solid #ddd;
-      background: #fff;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .product img { width: 100%; height: 150px; object-fit: cover; }
-    .product .info { padding: 10px; }
-    .error { color: red; }
-  </style>
+<meta charset="UTF-8" />
+<title>DNA Shoes — Admin Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root { --brand:#4b145b; --brand-2:#6a3e8e; --bg:#f7f6fb; --card:#ffffff; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#222}
+  header{background:var(--brand);color:#fff;padding:16px 24px;font-weight:700;text-align:center}
+  .wrap{max-width:1100px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:420px 1fr;gap:24px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.08);padding:18px}
+  h2{margin:0 0 12px;color:var(--brand)}
+  label{display:block;font-weight:600;margin:10px 0 6px}
+  input,select,textarea{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:15px}
+  textarea{resize:vertical}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:12px}
+  .btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+  .btn:hover{background:var(--brand-2)}
+  .btn.ghost{background:#eee;color:#333}
+  .status{font-weight:700;margin-top:8px;min-height:22px}
+  .preview{margin-top:10px;text-align:center}
+  .preview img{max-width:100%;max-height:220px;border-radius:10px}
+  /* list */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .item{border:1px solid #eee;border-radius:12px;overflow:hidden;background:#fff;position:relative}
+  .thumb{width:100%;height:160px;object-fit:cover;background:#fafafa}
+  .pad{padding:10px}
+  .cat{font-size:13px;color:#666}
+  .name{font-weight:700;margin:6px 0 2px}
+  .muted{opacity:.45;filter:grayscale(1)}
+  .badges{position:absolute;top:8px;left:8px;display:flex;gap:6px}
+  .badge{background:rgba(0,0,0,.7);color:#fff;font-size:12px;padding:3px 6px;border-radius:6px}
+  /* modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:16px}
+  .modal .sheet{background:#fff;max-width:520px;width:100%;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:18px}
+  .row{display:flex;gap:10px}
+  .row > *{flex:1}
+</style>
 </head>
 <body>
+<header>DNA Shoes — Admin Panel</header>
 
-  <h1>DNA Shoes Shop 🛒</h1>
+<div class="wrap">
+  <!-- Add / Seed -->
+  <section class="card">
+    <h2>Add New Product</h2>
+    <form id="form">
+      <label>Product Name</label>
+      <input id="name" required placeholder="e.g., Heritage Sneaker"/>
 
-  <!-- Upload Form -->
-  <div class="uploader">
-    <h2>Upload New Product</h2>
-    <input type="text" id="productName" placeholder="Product Name"><br>
-    <input type="file" id="imageInput" accept="image/*"><br>
-    <button onclick="uploadImage()">Upload & Add to Shop</button>
-    <p id="status"></p>
+      <label>Description</label>
+      <textarea id="desc" rows="3" required placeholder="Short description"></textarea>
+
+      <div class="row">
+        <div>
+          <label>Price (₦)</label>
+          <input id="price" type="number" min="0" step="0.01" required />
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="category" required>
+            <option value="">— Select —</option>
+            <option>Classic</option>
+            <option>Executive</option>
+            <option>Fashionista</option>
+            <option>Artisan</option>
+            <option>Custom</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Product Image</label>
+      <input id="image" type="file" accept="image/*" required />
+      <div class="preview" id="preview"></div>
+
+      <div class="actions">
+        <button type="submit" class="btn">Upload Product</button>
+        <button type="button" id="seedBtn" class="btn ghost" title="One-time fill with sample items">Seed Defaults</button>
+      </div>
+      <div class="status" id="status"></div>
+    </form>
+  </section>
+
+  <!-- List -->
+  <section class="card">
+    <h2>All Products</h2>
+    <div class="grid" id="list"></div>
+  </section>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal" id="editModal">
+  <div class="sheet">
+    <h2>Edit Product</h2>
+    <form id="editForm">
+      <input type="hidden" id="editKey"/>
+      <label>Name</label>
+      <input id="editName" required />
+      <label>Description</label>
+      <textarea id="editDesc" rows="3" required></textarea>
+      <div class="row">
+        <div>
+          <label>Price (₦)</label>
+          <input id="editPrice" type="number" min="0" step="0.01" required />
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="editCategory" required>
+            <option>Classic</option>
+            <option>Executive</option>
+            <option>Fashionista</option>
+            <option>Artisan</option>
+            <option>Custom</option>
+          </select>
+        </div>
+      </div>
+      <label>Replace Image (optional)</label>
+      <input id="editImage" type="file" accept="image/*" />
+      <div class="actions">
+        <button class="btn" type="submit">Save Changes</button>
+        <button class="btn ghost" type="button" id="closeEdit">Cancel</button>
+      </div>
+      <div class="status" id="editStatus"></div>
+    </form>
   </div>
+</div>
 
-  <!-- Shop -->
-  <div class="shop">
-    <h2>Shop</h2>
-    <div class="products" id="products"></div>
-  </div>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-  <script>
-    const apiKey = "b31a521a301e076d60af4558f03fc9db"; // ImgBB key
-    const productsDiv = document.getElementById("products");
-    const status = document.getElementById("status");
+<script>
+  // ==== CONFIG ====
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDf1FkJtMo6YLlk2BSv1fjark3dmpE634o",
+    authDomain: "fir-shop-75d43.firebaseapp.com",
+    databaseURL: "https://fir-shop-75d43-default-rtdb.firebaseio.com",
+    projectId: "fir-shop-75d43",
+    storageBucket: "fir-shop-75d43.firebasestorage.app",
+    messagingSenderId: "276108382023",
+    appId: "1:276108382023:web:b303c079df2cd29edac662"
+  };
+  const IMGBB_KEY = "b31a521a301e076d60af4558f03fc9db";
 
-    function renderProduct(name, imageUrl) {
-      const card = document.createElement("div");
-      card.className = "product";
-      card.innerHTML = `
-        <img src="${imageUrl}" alt="${name}">
-        <div class="info">
-          <h3>${name}</h3>
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const db = firebase.database();
+  const refProducts = db.ref("products");
+
+  // ==== UI refs ====
+  const form = document.getElementById('form');
+  const nameEl = document.getElementById('name');
+  const descEl = document.getElementById('desc');
+  const priceEl = document.getElementById('price');
+  const catEl = document.getElementById('category');
+  const imgEl = document.getElementById('image');
+  const previewEl = document.getElementById('preview');
+  const statusEl = document.getElementById('status');
+  const listEl = document.getElementById('list');
+  const seedBtn = document.getElementById('seedBtn');
+
+  // preview
+  imgEl.addEventListener('change', () => {
+    const f = imgEl.files[0];
+    if (!f) { previewEl.innerHTML = ''; return; }
+    const r = new FileReader();
+    r.onload = e => { previewEl.innerHTML = `<img src="${e.target.result}" alt="preview">`; };
+    r.readAsDataURL(f);
+  });
+
+  // helpers
+  const genId = () => `prod_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,7)}`;
+  async function uploadToImgBB(file){
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`,{ method:'POST', body:fd });
+    const data = await res.json();
+    if(!data.success) throw new Error('ImgBB upload failed');
+    return data.data.url; // direct URL
+  }
+
+  // add product
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const name = nameEl.value.trim();
+    const description = descEl.value.trim();
+    const price = parseFloat(priceEl.value);
+    const category = catEl.value;
+    const file = imgEl.files[0];
+
+    if(!name || !description || !price || !category || !file){
+      statusEl.textContent = "⚠️ Fill all fields & select image";
+      statusEl.style.color = "crimson"; return;
+    }
+    statusEl.textContent = "⏳ Uploading image...";
+    statusEl.style.color = "#333";
+
+    try{
+      const imageUrl = await uploadToImgBB(file);
+      statusEl.textContent = "⏳ Saving product...";
+      const id = genId();
+      const createdAt = Date.now();
+      await refProducts.push({
+        id, name, description, price, category,
+        image: imageUrl, hidden: false, createdAt
+      });
+      statusEl.textContent = "✅ Product added!";
+      statusEl.style.color = "green";
+      form.reset(); previewEl.innerHTML = "";
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = "❌ " + err.message;
+      statusEl.style.color = "crimson";
+    }
+  });
+
+  // render list
+  function renderList(products){
+    listEl.innerHTML = "";
+    const entries = Object.entries(products || {}).sort((a,b)=>(b[1]?.createdAt||0)-(a[1]?.createdAt||0));
+    for(const [key, p] of entries){
+      const muted = p.hidden ? "muted" : "";
+      const item = document.createElement('div');
+      item.className = `item ${muted}`;
+      item.innerHTML = `
+        <div class="badges">
+          <span class="badge">${p.category||"Uncat"}</span>
+          ${p.hidden ? `<span class="badge">Hidden</span>` : ""}
+        </div>
+        <img class="thumb" src="${p.image}" alt="${p.name}">
+        <div class="pad">
+          <div class="name">${p.name}</div>
+          <div>₦${Number(p.price).toLocaleString()}</div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn" data-edit="${key}">Edit</button>
+            <button class="btn ghost" data-toggle="${key}">${p.hidden ? "Show" : "Hide"}</button>
+          </div>
         </div>
       `;
-      productsDiv.prepend(card); // newest first
+      listEl.appendChild(item);
     }
+  }
 
-    function uploadImage() {
-      const productName = document.getElementById("productName").value.trim();
-      const imageFile = document.getElementById("imageInput").files[0];
+  // live subscribe
+  refProducts.on('value', snap => renderList(snap.val()));
 
-      if (!productName || !imageFile) {
-        status.textContent = "⚠️ Enter name and select image!";
-        status.className = "error";
-        return;
+  // hide/show + edit wiring
+  listEl.addEventListener('click', async (e)=>{
+    const t = e.target;
+    if(t.dataset.toggle){
+      const key = t.dataset.toggle;
+      const snap = await refProducts.child(key).get();
+      const cur = snap.val(); if(!cur) return;
+      await refProducts.child(key).update({ hidden: !cur.hidden });
+    }
+    if(t.dataset.edit){
+      openEdit(t.dataset.edit);
+    }
+  });
+
+  // ====== EDIT MODAL ======
+  const modal = document.getElementById('editModal');
+  const closeEdit = document.getElementById('closeEdit');
+  const editForm = document.getElementById('editForm');
+  const editKey = document.getElementById('editKey');
+  const editName = document.getElementById('editName');
+  const editDesc = document.getElementById('editDesc');
+  const editPrice = document.getElementById('editPrice');
+  const editCategory = document.getElementById('editCategory');
+  const editImage = document.getElementById('editImage');
+  const editStatus = document.getElementById('editStatus');
+
+  function openEdit(key){
+    refProducts.child(key).get().then(snap=>{
+      const p = snap.val(); if(!p) return;
+      editKey.value = key;
+      editName.value = p.name||"";
+      editDesc.value = p.description||"";
+      editPrice.value = p.price||0;
+      editCategory.value = p.category||"Classic";
+      editImage.value = "";
+      editStatus.textContent = "";
+      modal.style.display = "flex";
+    });
+  }
+  closeEdit.onclick = ()=>{ modal.style.display="none"; };
+
+  editForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    editStatus.style.color = "#333";
+    editStatus.textContent = "⏳ Saving...";
+    const key = editKey.value;
+    try{
+      let newImageUrl = null;
+      const file = editImage.files[0];
+      if(file){
+        editStatus.textContent = "⏳ Uploading new image...";
+        newImageUrl = await uploadToImgBB(file);
       }
-
-      status.textContent = "⏳ Uploading...";
-      status.className = "";
-
-      const formData = new FormData();
-      formData.append("image", imageFile);
-
-      fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: "POST",
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const imageUrl = data.data.url;
-          renderProduct(productName, imageUrl);
-          status.textContent = "✅ Uploaded & added to shop!";
-        } else {
-          status.textContent = "❌ Upload failed.";
-          console.error("Upload error:", data);
-        }
-      })
-      .catch(err => {
-        status.textContent = "❌ Upload failed.";
-        console.error("Error:", err);
-      });
+      const updates = {
+        name: editName.value.trim(),
+        description: editDesc.value.trim(),
+        price: parseFloat(editPrice.value),
+        category: editCategory.value
+      };
+      if(newImageUrl) updates.image = newImageUrl;
+      await refProducts.child(key).update(updates);
+      editStatus.style.color = "green";
+      editStatus.textContent = "✅ Updated!";
+      setTimeout(()=>{ modal.style.display="none"; }, 600);
+    }catch(err){
+      console.error(err);
+      editStatus.style.color = "crimson";
+      editStatus.textContent = "❌ " + err.message;
     }
-  </script>
+  });
 
+  // ===== SEED DEFAULTS (one-time) =====
+  seedBtn.addEventListener('click', async ()=>{
+    if(localStorage.getItem('dna_seeded')==='yes'){
+      alert('Already seeded. (Reset localStorage if you want to seed again.)');
+      return;
+    }
+    if(!confirm('Seed sample products into Firebase?')) return;
+
+    const samples = [
+      {name:"Oxford Heritage", description:"Classic leather oxford.", price:80000, category:"Classic",
+       image:"https://images.unsplash.com/photo-1520975922284-9d08a4663a5e?q=80&w=1200&auto=format&fit=crop"},
+      {name:"Executive Derby", description:"Premium derby for boardrooms.", price:120000, category:"Executive",
+       image:"https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1200&auto=format&fit=crop"},
+      {name:"Run Pro X", description:"Cushioned daily trainer.", price:62000, category:"Fashionista",
+       image:"https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?q=80&w=1200&auto=format&fit=crop"},
+      {name:"Artisan Mok", description:"Handstitched moccasin.", price:95000, category:"Artisan",
+       image:"https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200&auto=format&fit=crop"},
+      {name:"Custom DNA-01", description:"Made-to-order silhouette.", price:180000, category:"Custom",
+       image:"https://images.unsplash.com/photo-1520975890620-6a0f45363a3e?q=80&w=1200&auto=format&fit=crop"}
+    ];
+    try{
+      for(const s of samples){
+        await refProducts.push({
+          id: genId(), hidden:false, createdAt: Date.now(),
+          ...s
+        });
+      }
+      localStorage.setItem('dna_seeded','yes');
+      alert('✅ Seeded!');
+    }catch(err){
+      console.error(err);
+      alert('❌ Seed failed: ' + err.message);
+    }
+  });
+</script>
 </body>
 </html>
